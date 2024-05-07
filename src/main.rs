@@ -5,6 +5,8 @@ use rpassword::read_password;
 use std::io;
 use std::io::Write;
 use std::str::FromStr;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 use anyhow::{anyhow, Result};
 use reqwest::Url;
@@ -53,6 +55,13 @@ fn split_username(username: &str) -> Option<(&str, &str)> {
 
 #[tokio::main]
 async fn main() {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Failed setting up default tracing subscriber.");
+
     let mut username = String::new();
     print!("Please enter your EntraID username: ");
     io::stdout().flush().unwrap();
