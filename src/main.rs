@@ -82,6 +82,12 @@ async fn main() {
     let mut app =
         BrokerClientApplication::new(Some(&authority), None, None).expect("Failed creating app");
 
+    let exists = app
+        .check_user_exists(&username)
+        .await
+        .expect("Failed checking if user exists");
+    println!("User {} exists? {}", &username, exists);
+
     let scope = vec![];
 
     print!("{} password: ", &username);
