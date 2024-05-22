@@ -212,6 +212,7 @@ async fn main() {
             &username,
             &win_hello_key,
             vec![],
+            None,
             &mut tpm,
             &machine_key,
             "123456",
