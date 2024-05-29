@@ -139,26 +139,28 @@ async fn main() {
         }
     };
     print!("{}", mfa_req.msg);
-    io::stdout().flush().unwrap();
-    let input = match read_password() {
-        Ok(password) => password,
-        Err(e) => {
-            println!("{:?} ", e);
-            return ();
-        }
-    };
 
     let token1 = match mfa_req.mfa_method.as_str() {
-        "PhoneAppOTP" | "OneWaySMS" | "ConsolidatedTelephony" => match app
-            .acquire_token_by_mfa_flow(&username, Some(&input), None, &mut mfa_req)
-            .await
-        {
-            Ok(token) => token,
-            Err(e) => {
-                println!("MFA FAIL: {:?}", e);
-                return ();
+        "PhoneAppOTP" | "OneWaySMS" | "ConsolidatedTelephony" => {
+            io::stdout().flush().unwrap();
+            let input = match read_password() {
+                Ok(password) => password,
+                Err(e) => {
+                    println!("{:?} ", e);
+                    return ();
+                }
+            };
+            match app
+                .acquire_token_by_mfa_flow(&username, Some(&input), None, &mut mfa_req)
+                .await
+            {
+                Ok(token) => token,
+                Err(e) => {
+                    println!("MFA FAIL: {:?}", e);
+                    return ();
+                }
             }
-        },
+        }
         _ => {
             let mut poll_attempt = 1;
             let polling_interval = mfa_req.polling_interval.unwrap_or(5000);
