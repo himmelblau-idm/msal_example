@@ -1,10 +1,13 @@
 use kanidm_hsm_crypto::soft::SoftTpm;
 use kanidm_hsm_crypto::{AuthValue, BoxedDynTpm, Tpm};
+use msal::error::MsalError;
 use msal::{BrokerClientApplication, EnrollAttrs};
 use rpassword::read_password;
 use std::io;
 use std::io::Write;
 use std::str::FromStr;
+use std::thread::sleep;
+use std::time::Duration;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -125,7 +128,7 @@ async fn main() {
             return ();
         }
     };
-    let mfa_req = match app
+    let mut mfa_req = match app
         .initiate_acquire_token_by_mfa_flow_for_device_enrollment(&username, &password)
         .await
     {
@@ -145,14 +148,39 @@ async fn main() {
         }
     };
 
-    let token1 = match app
-        .acquire_token_by_mfa_flow(&username, Some(&input), None, mfa_req)
-        .await
-    {
-        Ok(token) => token,
-        Err(e) => {
-            println!("MFA FAIL: {:?}", e);
-            return ();
+    let token1 = match mfa_req.mfa_method.as_str() {
+        "PhoneAppOTP" | "OneWaySMS" | "ConsolidatedTelephony" => match app
+            .acquire_token_by_mfa_flow(&username, Some(&input), None, &mut mfa_req)
+            .await
+        {
+            Ok(token) => token,
+            Err(e) => {
+                println!("MFA FAIL: {:?}", e);
+                return ();
+            }
+        },
+        _ => {
+            let mut poll_attempt = 1;
+            let polling_interval = mfa_req.polling_interval.unwrap_or(5000);
+            loop {
+                match app
+                    .acquire_token_by_mfa_flow(&username, None, Some(poll_attempt), &mut mfa_req)
+                    .await
+                {
+                    Ok(token) => break token,
+                    Err(e) => match e {
+                        MsalError::MFAPollContinue => {
+                            poll_attempt += 1;
+                            sleep(Duration::from_millis(polling_interval.into()));
+                            continue;
+                        }
+                        e => {
+                            println!("MFA FAIL: {:?}", e);
+                            return ();
+                        }
+                    },
+                }
+            }
         }
     };
 
