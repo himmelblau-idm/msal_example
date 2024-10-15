@@ -1,7 +1,7 @@
+use himmelblau::error::MsalError;
+use himmelblau::{BrokerClientApplication, EnrollAttrs};
 use kanidm_hsm_crypto::soft::SoftTpm;
 use kanidm_hsm_crypto::{AuthValue, BoxedDynTpm, Tpm};
-use msal::error::MsalError;
-use msal::{BrokerClientApplication, EnrollAttrs};
 use rpassword::read_password;
 use std::io;
 use std::io::Write;
@@ -187,7 +187,7 @@ async fn main() {
     };
 
     let (_transport_key, _cert_key, device_id) = match app
-        .enroll_device(&token1, attrs, &mut tpm, &machine_key)
+        .enroll_device(&token1.refresh_token, attrs, &mut tpm, &machine_key)
         .await
     {
         Ok((transport_key, cert_key, device_id)) => (transport_key, cert_key, device_id),
