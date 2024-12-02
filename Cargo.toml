@@ -17,6 +17,6 @@ serde = "1.0.200"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 sha2 = "0.10.8"
-authenticator = "0.4.1"
+authenticator = { version = "0.4.1", default-features = false, features = ["crypto_openssl"] }
 base64 = "0.22.1"
 serde_json = "1.0.132"
