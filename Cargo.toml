@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libhimmelblau = { version = "0.4.0", features = ["developer"] }
+libhimmelblau = { version = "0.5.0", features = ["developer"] }
 tokio = { version = "1.35.1", features = ["full"] }
 openssl = "0.10.62"
 uuid = { version = "^1.4.1", features = [ "v4" ] }

@@ -252,22 +252,27 @@ async fn main() {
     let mut app =
         BrokerClientApplication::new(Some(&authority), None, None).expect("Failed creating app");
 
-    let exists = app
-        .check_user_exists(&username)
+    let auth_options = vec![AuthOption::Fido, AuthOption::Passwordless];
+    let auth_init = app
+        .check_user_exists(&username, &auth_options)
         .await
         .expect("Failed checking if user exists");
-    println!("User {} exists? {}", &username, exists);
+    println!("User {} exists? {}", &username, auth_init.exists());
 
     let scope = vec![];
 
-    print!("{} password: ", &username);
-    io::stdout().flush().unwrap();
-    let password = match read_password() {
-        Ok(password) => password,
-        Err(e) => {
-            println!("{:?}", e);
-            return ();
+    let password = if !auth_init.passwordless() {
+        print!("{} password: ", &username);
+        io::stdout().flush().unwrap();
+        match read_password() {
+            Ok(password) => Some(password),
+            Err(e) => {
+                println!("{:?}", e);
+                return ();
+            }
         }
+    } else {
+        None
     };
 
     println!("Attempting device enrollment");
@@ -298,8 +303,9 @@ async fn main() {
     let mut mfa_req = match app
         .initiate_acquire_token_by_mfa_flow_for_device_enrollment(
             &username,
-            &password,
-            vec![AuthOption::Fido],
+            password.as_deref(),
+            &auth_options,
+            Some(auth_init),
         )
         .await
     {
