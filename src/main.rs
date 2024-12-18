@@ -24,7 +24,7 @@ use authenticator::{
     statecallback::StateCallback,
     Pin, StatusPinUv, StatusUpdate,
 };
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
 use serde_json::{json, to_string as json_to_string};
 use sha2::{Digest, Sha256};
@@ -158,7 +158,7 @@ async fn fido_auth(flow: &MFAAuthContinue) -> Result<String, Box<dyn std::error:
 
     let allow_list: Vec<PublicKeyCredentialDescriptor> = fido_allow_list
         .into_iter()
-        .filter_map(|id| match URL_SAFE_NO_PAD.decode(id) {
+        .filter_map(|id| match STANDARD.decode(id) {
             Ok(decoded_id) => Some(PublicKeyCredentialDescriptor {
                 id: decoded_id,
                 transports: vec![],
