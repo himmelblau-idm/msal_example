@@ -1,4 +1,5 @@
 use himmelblau::error::MsalError;
+use himmelblau::graph::Graph;
 use himmelblau::{AuthOption, BrokerClientApplication, EnrollAttrs, MFAAuthContinue};
 use kanidm_hsm_crypto::soft::SoftTpm;
 use kanidm_hsm_crypto::{AuthValue, BoxedDynTpm, Tpm};
@@ -10,10 +11,6 @@ use std::thread::sleep;
 use std::time::Duration;
 use tracing::{error, Level};
 use tracing_subscriber::FmtSubscriber;
-
-use anyhow::{anyhow, Result};
-use reqwest::Url;
-use serde::Deserialize;
 
 use authenticator::{
     authenticatorservice::{AuthenticatorService, SignArgs},
@@ -30,39 +27,6 @@ use serde_json::{json, to_string as json_to_string};
 use sha2::{Digest, Sha256};
 use std::sync::mpsc::{channel, RecvError};
 use std::thread;
-
-#[derive(Debug, Deserialize)]
-struct FederationProvider {
-    #[serde(rename = "tenantId")]
-    tenant_id: String,
-    authority_host: String,
-    graph: String,
-}
-
-async fn request_federation_provider(
-    odc_provider: &str,
-    domain: &str,
-) -> Result<(String, String, String)> {
-    let url = Url::parse_with_params(
-        &format!("https://{}/odc/v2.1/federationProvider", odc_provider),
-        &[("domain", domain)],
-    )?;
-
-    let resp = reqwest::get(url).await?;
-    if resp.status().is_success() {
-        let json_resp: FederationProvider = resp.json().await?;
-        println!("Discovered tenant_id: {}", json_resp.tenant_id);
-        println!("Discovered authority_host: {}", json_resp.authority_host);
-        println!("Discovered graph: {}", json_resp.graph);
-        Ok((
-            json_resp.authority_host,
-            json_resp.tenant_id,
-            json_resp.graph,
-        ))
-    } else {
-        Err(anyhow!(resp.status()))
-    }
-}
 
 fn split_username(username: &str) -> Option<(&str, &str)> {
     let tup: Vec<&str> = username.split('@').collect();
@@ -242,10 +206,14 @@ async fn main() {
 
     let (_, domain) = split_username(&username).expect("Failed splitting username");
 
-    let (authority_host, tenant_id, _graph) =
-        request_federation_provider("odc.officeapps.live.com", &domain)
-            .await
-            .expect("Failed discovering tenant");
+    let graph = Graph::new("odc.officeapps.live.com", &domain, None, None, None)
+        .await
+        .expect("Failed discovering tenant");
+    let authority_host = graph
+        .authority_host()
+        .await
+        .expect("Failed discovering tenant");
+    let tenant_id = graph.tenant_id().await.expect("Failed discovering tenant");
 
     let authority = format!("https://{}/{}", authority_host, tenant_id);
     println!("Creating the broker app");
