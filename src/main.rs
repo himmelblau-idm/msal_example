@@ -218,7 +218,7 @@ async fn main() {
     let authority = format!("https://{}/{}", authority_host, tenant_id);
     println!("Creating the broker app");
     let mut app =
-        BrokerClientApplication::new(Some(&authority), None, None).expect("Failed creating app");
+        BrokerClientApplication::new(Some(&authority), None, None, None).expect("Failed creating app");
 
     let auth_options = vec![AuthOption::Fido, AuthOption::Passwordless];
     let auth_init = app
