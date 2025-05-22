@@ -1,5 +1,6 @@
 use himmelblau::error::MsalError;
 use himmelblau::graph::Graph;
+use himmelblau::intune::{IntuneForLinux, IntuneStatus};
 use himmelblau::{AuthOption, BrokerClientApplication, EnrollAttrs, MFAAuthContinue};
 use kanidm_hsm_crypto::soft::SoftTpm;
 use kanidm_hsm_crypto::{AuthValue, BoxedDynTpm, Tpm};
@@ -217,8 +218,8 @@ async fn main() {
 
     let authority = format!("https://{}/{}", authority_host, tenant_id);
     println!("Creating the broker app");
-    let mut app =
-        BrokerClientApplication::new(Some(&authority), None, None, None).expect("Failed creating app");
+    let mut app = BrokerClientApplication::new(Some(&authority), None, None, None)
+        .expect("Failed creating app");
 
     let auth_options = vec![AuthOption::Fido, AuthOption::Passwordless];
     let auth_init = app
@@ -306,7 +307,7 @@ async fn main() {
                 }
             }
         }
-        "PhoneAppOTP" | "OneWaySMS" | "ConsolidatedTelephony" => {
+        "AccessPass" | "PhoneAppOTP" | "OneWaySMS" | "ConsolidatedTelephony" => {
             io::stdout().flush().unwrap();
             let input = match read_password() {
                 Ok(password) => password,
@@ -352,7 +353,7 @@ async fn main() {
     };
 
     let (_transport_key, _cert_key, device_id) = match app
-        .enroll_device(&token1.refresh_token, attrs, &mut tpm, &machine_key)
+        .enroll_device(&token1.refresh_token, attrs.clone(), &mut tpm, &machine_key)
         .await
     {
         Ok((transport_key, cert_key, device_id)) => (transport_key, cert_key, device_id),
@@ -363,11 +364,160 @@ async fn main() {
     };
     println!("Enrolled with device id: {}", device_id);
 
+    println!("Obtaining a token for Intune Service Endpoint Discovery");
+    let intune_service_endpoint_discovery_token = match app
+        .acquire_token_by_refresh_token(
+            &token1.refresh_token,
+            vec!["00000003-0000-0000-c000-000000000000/.default"],
+            None,
+            Some("b743a22d-6705-4147-8670-d92fa515ee2b"),
+            &mut tpm,
+            &machine_key,
+        )
+        .await
+    {
+        Ok(token) => token,
+        Err(e) => {
+            println!("{:?}", e);
+            return ();
+        }
+    };
+
+    println!("Obtaining Intune service endpoints");
+    let endpoints = match graph
+        .intune_service_endpoints(
+            &intune_service_endpoint_discovery_token
+                .access_token
+                .clone()
+                .unwrap(),
+        )
+        .await
+    {
+        Ok(endpoints) => endpoints,
+        Err(e) => {
+            println!("{:?}", e);
+            return ();
+        }
+    };
+
+    let intune = match IntuneForLinux::new(endpoints) {
+        Ok(intune) => intune,
+        Err(e) => {
+            println!("{:?}", e);
+            return ();
+        }
+    };
+
+    println!("Obtaining a token for Intune enrollment");
+    let intune_enroll_token = match app
+        .acquire_token_by_refresh_token(
+            &token1.refresh_token,
+            vec!["d4ebce55-015a-49b5-a083-c84d1797ae8c/.default"],
+            None,
+            Some("b743a22d-6705-4147-8670-d92fa515ee2b"),
+            &mut tpm,
+            &machine_key,
+        )
+        .await
+    {
+        Ok(token) => token,
+        Err(e) => {
+            println!("{:?}", e);
+            return ();
+        }
+    };
+
+    println!("Performing Intune enrollment");
+    let (_intune_cert_key, intune_device_id) = match intune
+        .enroll(
+            &intune_enroll_token,
+            &attrs,
+            &device_id,
+            &mut tpm,
+            &machine_key,
+        )
+        .await
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            println!("{:?}", e);
+            return ();
+        }
+    };
+
+    for i in 1..=3 {
+        println!("Obtaining a token for Intune Company Portal");
+        let intune_checkin_token = match app
+            .acquire_token_by_refresh_token(
+                &token1.refresh_token,
+                vec!["0000000a-0000-0000-c000-000000000000/.default"],
+                None,
+                Some("b743a22d-6705-4147-8670-d92fa515ee2b"),
+                &mut tpm,
+                &machine_key,
+            )
+            .await
+        {
+            Ok(token) => token,
+            Err(e) => {
+                println!("{:?}", e);
+                return ();
+            }
+        };
+
+        println!("Updating Intune device details");
+        match intune
+            .details(&intune_checkin_token, &attrs, &intune_device_id)
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{:?}", e);
+                return ();
+            }
+        };
+
+        println!("Performing Intune Device callback");
+        let policies = match intune
+            .policies(&intune_checkin_token, &intune_device_id)
+            .await
+        {
+            Ok(policies) => policies,
+            Err(e) => {
+                println!("{:?}", e);
+                return ();
+            }
+        };
+        println!("{:?}", policies);
+
+        let mut statuses: IntuneStatus = policies.into();
+        statuses.set_device_id(intune_device_id.clone());
+
+        for policy_status in &mut statuses.policy_statuses {
+            for policy_detail in &mut policy_status.details {
+                // Mark all the policies as compliant
+                policy_detail.set_status(None, Some(policy_detail.expected_value.clone()), true);
+            }
+        }
+        match intune.status(&intune_checkin_token, statuses).await {
+            Ok(statuses) => println!("{:?}", statuses),
+            Err(e) => {
+                println!("{:?}", e);
+                return ();
+            }
+        }
+
+        if i < 3 {
+            sleep(Duration::from_secs(5));
+        }
+    }
+
     println!("Obtain PRT from enrollment refresh token");
     let token = match app
         .acquire_token_by_refresh_token(
             &token1.refresh_token,
             scope.clone(),
+            None,
             None,
             &mut tpm,
             &machine_key,
@@ -407,6 +557,7 @@ async fn main() {
             &username,
             &win_hello_key,
             vec![],
+            None,
             None,
             &mut tpm,
             &machine_key,
