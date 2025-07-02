@@ -2,8 +2,8 @@ use himmelblau::error::MsalError;
 use himmelblau::graph::Graph;
 use himmelblau::intune::{IntuneForLinux, IntuneStatus};
 use himmelblau::{AuthOption, BrokerClientApplication, EnrollAttrs, MFAAuthContinue};
-use kanidm_hsm_crypto::soft::SoftTpm;
-use kanidm_hsm_crypto::{AuthValue, BoxedDynTpm, Tpm};
+use kanidm_hsm_crypto::provider::SoftTpm;
+use kanidm_hsm_crypto::{AuthValue, provider::BoxedDynTpm, provider::Tpm};
 use rpassword::read_password;
 use std::io;
 use std::io::Write;
@@ -251,10 +251,10 @@ async fn main() {
     // Request a new machine-key-context. This key "owns" anything
     // created underneath it.
     let loadable_machine_key = tpm
-        .machine_key_create(&auth_value)
+        .root_storage_key_create(&auth_value)
         .expect("Unable to create new machine key");
     let machine_key = tpm
-        .machine_key_load(&auth_value, &loadable_machine_key)
+        .root_storage_key_load(&auth_value, &loadable_machine_key)
         .expect("Unable to load machine key");
     let attrs = match EnrollAttrs::new(
         domain.to_string(),
