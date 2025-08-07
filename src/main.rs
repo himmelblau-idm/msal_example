@@ -1,6 +1,6 @@
 use himmelblau::error::MsalError;
 use himmelblau::graph::Graph;
-use himmelblau::intune::{IntuneForLinux, IntuneStatus};
+use himmelblau::intune::{ComplianceState, IntuneForLinux, IntuneStatus};
 use himmelblau::{AuthOption, BrokerClientApplication, EnrollAttrs, MFAAuthContinue};
 use kanidm_hsm_crypto::provider::SoftTpm;
 use kanidm_hsm_crypto::{AuthValue, provider::BoxedDynTpm, provider::Tpm};
@@ -496,7 +496,7 @@ async fn main() {
         for policy_status in &mut statuses.policy_statuses {
             for policy_detail in &mut policy_status.details {
                 // Mark all the policies as compliant
-                policy_detail.set_status(None, Some(policy_detail.expected_value.clone()), true);
+                policy_detail.set_status(None, Some(policy_detail.expected_value.clone()), &ComplianceState::Compliant);
             }
         }
         match intune.status(&intune_checkin_token, statuses).await {
