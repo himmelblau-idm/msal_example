@@ -286,7 +286,7 @@ async fn main() {
     };
     print!("{}", mfa_req.msg);
 
-    let token1 = match mfa_req.mfa_method.as_str() {
+    let token1 = match mfa_req.mfa_method().as_str() {
         "FidoKey" => {
             // Create the assertion
             let assertion = match fido_auth(&mfa_req).await {
