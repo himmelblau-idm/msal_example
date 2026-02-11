@@ -1,9 +1,11 @@
 use himmelblau::error::MsalError;
 use himmelblau::graph::Graph;
-use himmelblau::intune::{ComplianceState, IntuneForLinux, IntuneStatus};
+use himmelblau::intune::{
+    fetch_intune_portal_versions, ComplianceState, IntuneForLinux, IntuneStatus,
+};
 use himmelblau::{AuthOption, BrokerClientApplication, EnrollAttrs, MFAAuthContinue};
 use kanidm_hsm_crypto::provider::SoftTpm;
-use kanidm_hsm_crypto::{AuthValue, provider::BoxedDynTpm, provider::Tpm};
+use kanidm_hsm_crypto::{provider::BoxedDynTpm, provider::Tpm, AuthValue};
 use rpassword::read_password;
 use std::io;
 use std::io::Write;
@@ -400,7 +402,19 @@ async fn main() {
         }
     };
 
-    let intune = match IntuneForLinux::new(endpoints) {
+    let vers = match fetch_intune_portal_versions(Some(
+        "https://packages.microsoft.com/ubuntu/22.04/prod/pool/main/i/intune-portal/",
+    ))
+    .await
+    {
+        Ok(vers) => vers,
+        Err(e) => {
+            println!("{:?}", e);
+            return ();
+        }
+    };
+
+    let intune = match IntuneForLinux::new(endpoints, Some(&vers[vers.len() - 1])) {
         Ok(intune) => intune,
         Err(e) => {
             println!("{:?}", e);
