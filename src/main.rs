@@ -521,6 +521,39 @@ async fn main() {
             }
         }
 
+        sleep(Duration::from_secs(3));
+
+        println!("Obtaining IWService Token");
+        let iwservice_token = match app
+            .acquire_token_by_refresh_token(
+                &token1.refresh_token,
+                vec!["b8066b99-6e67-41be-abfa-75db1a2c8809/.default"],
+                None,
+                Some("b743a22d-6705-4147-8670-d92fa515ee2b"),
+                &mut tpm,
+                &machine_key,
+            )
+            .await
+        {
+            Ok(token) => token,
+            Err(e) => {
+                println!("{:?}", e);
+                return ();
+            }
+        };
+
+        let device_info = match intune
+            .get_compliance_info(&iwservice_token, &intune_device_id)
+            .await
+        {
+            Ok(device_info) => device_info,
+            Err(e) => {
+                println!("{:?}", e);
+                return ();
+            }
+        };
+        println!("Intune compliance info: {:?}", device_info);
+
         if i < 3 {
             sleep(Duration::from_secs(5));
         }
