@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libhimmelblau = { version = "0.8.9", features = ["developer", "on_behalf_of", "optional_mfa", "intune_portal_vers_selection"] }
+libhimmelblau = { version = "0.8.18", features = ["developer", "on_behalf_of", "optional_mfa", "intune_portal_vers_selection", "set_timeout"] }
 tokio = { version = "1.35.1", features = ["full"] }
 openssl = "0.10.62"
 uuid = { version = "^1.4.1", features = [ "v4" ] }

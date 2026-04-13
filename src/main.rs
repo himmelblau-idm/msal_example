@@ -209,7 +209,7 @@ async fn main() {
 
     let (_, domain) = split_username(&username).expect("Failed splitting username");
 
-    let graph = Graph::new("odc.officeapps.live.com", &domain, None, None, None)
+    let graph = Graph::new("odc.officeapps.live.com", &domain, None, None, None, Duration::from_secs(30))
         .await
         .expect("Failed discovering tenant");
     let authority_host = graph
@@ -220,7 +220,7 @@ async fn main() {
 
     let authority = format!("https://{}/{}", authority_host, tenant_id);
     println!("Creating the broker app");
-    let mut app = BrokerClientApplication::new(Some(&authority), None, None, None)
+    let mut app = BrokerClientApplication::new(Some(&authority), None, None, None, Duration::from_secs(30))
         .expect("Failed creating app");
 
     let auth_options = vec![AuthOption::Fido, AuthOption::Passwordless];
@@ -414,7 +414,7 @@ async fn main() {
         }
     };
 
-    let intune = match IntuneForLinux::new(endpoints, Some(&vers[vers.len() - 1])) {
+    let intune = match IntuneForLinux::new(endpoints, Some(&vers[vers.len() - 1]), Duration::from_secs(30)) {
         Ok(intune) => intune,
         Err(e) => {
             println!("{:?}", e);
